@@ -9,11 +9,13 @@ import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatLanguageModel;
 import dev.langchain4j.store.memory.chat.ChatMemoryStore;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
@@ -22,6 +24,7 @@ import java.util.List;
 import java.util.Locale;
 
 @Component
+@Slf4j
 public class MongoDBChatMemoryStore implements ChatMemoryStore {
 
     private final MongoTemplate mongoTemplate;
@@ -41,17 +44,14 @@ public class MongoDBChatMemoryStore implements ChatMemoryStore {
     @Override
     public List<ChatMessage> getMessages(Object memoryId) {
         String sessionId = memoryId.toString();
-        Query query = Query.query(new Criteria().orOperator(
-                Criteria.where("sessionId").is(sessionId),
-                Criteria.where("userId").is(sessionId)
-        ));
-        ChatSession session = mongoTemplate.findOne(query, ChatSession.class);
+        ChatSession session = findBySessionIdOrLegacy(sessionId);
 
         if (session == null || session.getMessages() == null) {
+            log.info("读取会话历史, sessionId={}, messagesCount=0", sessionId);
             return List.of();
         }
 
-        return session.getMessages().stream()
+        List<ChatMessage> mapped = session.getMessages().stream()
                 .map(msg -> {
                     String role = msg.getRole() == null ? "" : msg.getRole().trim().toLowerCase(Locale.ROOT);
                     String content = msg.getContent() == null ? "" : msg.getContent();
@@ -63,6 +63,8 @@ public class MongoDBChatMemoryStore implements ChatMemoryStore {
                         default -> AiMessage.from(content);
                     };
                 }).toList();
+        log.info("读取会话历史, sessionId={}, messagesCount={}", sessionId, mapped.size());
+        return mapped;
     }
 
     /**
@@ -71,41 +73,40 @@ public class MongoDBChatMemoryStore implements ChatMemoryStore {
     @Override
     public void updateMessages(Object memoryId, List<ChatMessage> messages) {
         String sessionId = memoryId.toString();
-        Query query = Query.query(new Criteria().orOperator(
-                Criteria.where("sessionId").is(sessionId),
-                Criteria.where("userId").is(sessionId)
-        ));
-        ChatSession session = mongoTemplate.findOne(query, ChatSession.class);
+        ChatSession session = findBySessionIdOrLegacy(sessionId);
 
-        if (session == null) {
-            session = new ChatSession();
+        List<Message> persisted = session == null || session.getMessages() == null
+                ? List.of()
+                : session.getMessages();
+        List<Message> increments = toIncrementalMessages(persisted, messages);
 
-            session.setSessionId(sessionId);
-            session.setTitle("新对话");
-            session.setCreatedAt(LocalDateTime.now());
-        } else if (session.getSessionId() == null || session.getSessionId().isBlank()) {
-            // 兼容历史文档：将旧的 userId 会话键补齐到 sessionId 字段。
-            session.setSessionId(sessionId);
+        LocalDateTime now = LocalDateTime.now();
+        Query writeQuery = session != null && session.getId() != null
+                ? Query.query(Criteria.where("_id").is(session.getId()))
+                : Query.query(Criteria.where("sessionId").is(sessionId));
+
+        Update update = new Update()
+                .set("updatedAt", now)
+                .setOnInsert("sessionId", sessionId)
+                .setOnInsert("createdAt", now)
+                .setOnInsert("title", "新对话");
+
+        if (session != null && (session.getSessionId() == null || session.getSessionId().isBlank())) {
+            // 兼容旧文档，补齐 sessionId，后续查询直接命中 sessionId。
+            update.set("sessionId", sessionId);
         }
 
-        if (session.getMessages() == null) {
-            session.setMessages(new ArrayList<>());
+        if (session == null || shouldGenerateTitle(session)) {
+            update.set("title", generateTitle(messages));
         }
 
-        session.getMessages().clear();
-        for (ChatMessage chatMsg : messages) {
-            Message msg = new Message();
-            msg.setRole(toRole(chatMsg));
-            msg.setContent(extractText(chatMsg));
-            msg.setTimestamp(LocalDateTime.now());
-            session.getMessages().add(msg);
+        if (!increments.isEmpty()) {
+            update.push("messages").each(increments.toArray());
         }
 
-        if (shouldGenerateTitle(session)) {
-            session.setTitle(generateTitle(messages));
-        }
-        session.setUpdatedAt(LocalDateTime.now());
-        mongoTemplate.save(session);
+        mongoTemplate.upsert(writeQuery, update, ChatSession.class);
+        log.info("持久化会话历史, sessionId={}, incomingWindow={}, appended={}, totalBefore={}",
+                sessionId, messages == null ? 0 : messages.size(), increments.size(), persisted.size());
     }
 
     /**
@@ -118,7 +119,40 @@ public class MongoDBChatMemoryStore implements ChatMemoryStore {
                 Criteria.where("sessionId").is(sessionId),
                 Criteria.where("userId").is(sessionId)
         ));
-        mongoTemplate.remove(query, ChatSession.class);
+        long deleted = mongoTemplate.remove(query, ChatSession.class).getDeletedCount();
+        log.info("删除会话历史, sessionId={}, deleted={}", sessionId, deleted);
+    }
+
+    private ChatSession findBySessionIdOrLegacy(String sessionId) {
+        ChatSession bySessionId = mongoTemplate.findOne(
+                Query.query(Criteria.where("sessionId").is(sessionId)),
+                ChatSession.class
+        );
+        if (bySessionId != null) {
+            return bySessionId;
+        }
+        return mongoTemplate.findOne(
+                Query.query(Criteria.where("userId").is(sessionId)),
+                ChatSession.class
+        );
+    }
+
+    private List<Message> toIncrementalMessages(List<Message> persisted, List<ChatMessage> incoming) {
+        if (incoming == null || incoming.isEmpty()) {
+            return List.of();
+        }
+
+        int overlap = findSuffixPrefixOverlap(persisted, incoming);
+        List<Message> result = new ArrayList<>(Math.max(0, incoming.size() - overlap));
+        for (int i = overlap; i < incoming.size(); i++) {
+            ChatMessage chatMsg = incoming.get(i);
+            Message msg = new Message();
+            msg.setRole(toRole(chatMsg));
+            msg.setContent(extractText(chatMsg));
+            msg.setTimestamp(LocalDateTime.now());
+            result.add(msg);
+        }
+        return result;
     }
 
     private String toRole(ChatMessage chatMsg) {
@@ -196,5 +230,41 @@ public class MongoDBChatMemoryStore implements ChatMemoryStore {
             return cleaned.substring(0, 20);
         }
         return cleaned;
+    }
+
+    private int findSuffixPrefixOverlap(List<Message> persisted, List<ChatMessage> incoming) {
+        if (persisted == null || persisted.isEmpty() || incoming == null || incoming.isEmpty()) {
+            return 0;
+        }
+
+        int max = Math.min(persisted.size(), incoming.size());
+        for (int overlap = max; overlap > 0; overlap--) {
+            boolean match = true;
+            int start = persisted.size() - overlap;
+
+            for (int i = 0; i < overlap; i++) {
+                Message oldMsg = persisted.get(start + i);
+                ChatMessage newMsg = incoming.get(i);
+
+                String oldRole = normalize(oldMsg.getRole());
+                String newRole = normalize(toRole(newMsg));
+                String oldContent = normalize(oldMsg.getContent());
+                String newContent = normalize(extractText(newMsg));
+
+                if (!oldRole.equals(newRole) || !oldContent.equals(newContent)) {
+                    match = false;
+                    break;
+                }
+            }
+
+            if (match) {
+                return overlap;
+            }
+        }
+        return 0;
+    }
+
+    private String normalize(String text) {
+        return text == null ? "" : text.trim();
     }
 }

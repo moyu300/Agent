@@ -35,6 +35,7 @@ public class AssistantController {
 
     @GetMapping("/sessions")
     public ApiResponse<List<SessionSummary>> sessions(@RequestParam(required = false) String userId) {
+        log.info("查询会话列表, userId={}", StringUtils.hasText(userId) ? userId.trim() : "ALL");
         List<ChatSession> sessions = StringUtils.hasText(userId)
                 ? chatSessionRepository.findByUserIdOrderByUpdatedAtDesc(userId.trim())
                 : chatSessionRepository.findAllByOrderByUpdatedAtDesc();
@@ -43,18 +44,22 @@ public class AssistantController {
                 .sorted(Comparator.comparing(ChatSession::getUpdatedAt, Comparator.nullsLast(Comparator.naturalOrder())).reversed())
                 .map(this::toSummary)
                 .toList();
+        log.info("会话列表查询完成, count={}", data.size());
         return ApiResponse.success(data);
     }
 
     @GetMapping("/sessions/detail")
     public ApiResponse<SessionDetail> sessionDetail(@RequestParam String sessionId) {
+        log.info("查询会话详情, sessionId={}", sessionId);
         ChatSession session = findBySessionIdOrLegacy(sessionId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "会话不存在"));
+        log.info("会话详情查询完成, sessionId={}, messagesCount={}", sessionId, session.getMessages() == null ? 0 : session.getMessages().size());
         return ApiResponse.success(toDetail(session));
     }
 
     @PostMapping("/sessions")
     public ApiResponse<SessionSummary> createSession() {
+        log.info("创建新会话");
         String sessionId = String.valueOf(System.currentTimeMillis());
         ChatSession session = new ChatSession();
         session.setSessionId(sessionId);
@@ -62,12 +67,15 @@ public class AssistantController {
         session.setCreatedAt(LocalDateTime.now());
         session.setUpdatedAt(LocalDateTime.now());
         ChatSession saved = chatSessionRepository.save(session);
+        log.info("新会话创建完成, sessionId={}", sessionId);
         return ApiResponse.success(toSummary(saved));
     }
 
     @DeleteMapping("/sessions")
     public ApiResponse<Void> deleteSession(@RequestParam String sessionId) {
+        log.info("删除会话, sessionId={}", sessionId);
         findBySessionIdOrLegacy(sessionId).ifPresent(chatSessionRepository::delete);
+        log.info("会话删除完成, sessionId={}", sessionId);
         return ApiResponse.success(null);
     }
 
@@ -76,6 +84,7 @@ public class AssistantController {
         if (request == null || !StringUtils.hasText(request.message())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "message 不能为空");
         }
+        log.info("用户提问, sessionId={}, message={}", request.sessionId(), request.message());
 
         String sessionId = StringUtils.hasText(request.sessionId())
                 ? request.sessionId().trim()
@@ -84,6 +93,7 @@ public class AssistantController {
         String answer = assistant.chat(sessionId, request.message().trim());
         ChatSession session = findBySessionIdOrLegacy(sessionId).orElse(null);
         String title = session != null && StringUtils.hasText(session.getTitle()) ? session.getTitle() : "新对话";
+        log.info("用户提问完成, sessionId={}, answer={}", sessionId, answer);
         return ApiResponse.success(new ChatResponse(sessionId, request.message().trim(), answer, title));
     }
 
@@ -92,11 +102,12 @@ public class AssistantController {
         if (request == null || !StringUtils.hasText(request.message())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "message 不能为空");
         }
+        log.info("Stream 用户提问, sessionId={}, message={}", request.sessionId(), request.message());
 
         String sessionId = StringUtils.hasText(request.sessionId())
                 ? request.sessionId().trim()
                 : String.valueOf(System.currentTimeMillis());
-
+        log.info("用户提问完成, sessionId={}", sessionId);
         return assistant.chatStream(sessionId, request.message().trim())
                 .map(token -> ServerSentEvent.<String>builder()
                         .event("message")
@@ -114,6 +125,7 @@ public class AssistantController {
 
     @PostMapping(value = "/files/recognize", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiResponse<FileRecognizeResponse> recognizeFile(@RequestParam("file") MultipartFile file) {
+        log.info("文件识别, fileName={}", file.getOriginalFilename());
         FileRecognitionService.FileRecognitionResult result = fileRecognitionService.recognize(file);
         return ApiResponse.success(new FileRecognizeResponse(
                 result.fileName(),
@@ -125,6 +137,7 @@ public class AssistantController {
 
     @PostMapping(value = "/audio/transcribe", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiResponse<AudioTranscribeResponse> transcribeAudio(@RequestParam("file") MultipartFile file) {
+        log.info("音频转录, fileName={}", file.getOriginalFilename());
         String text = fileRecognitionService.transcribeAudio(file);
         return ApiResponse.success(new AudioTranscribeResponse(text));
     }
