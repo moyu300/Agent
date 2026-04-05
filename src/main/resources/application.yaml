@@ -1,0 +1,54 @@
+spring:
+  application:
+    name: Agent-Assistant
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/agent
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 20MB
+
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+logging:
+  level:
+    root: info
+
+multimodal:
+  api:
+    # OpenAI 兼容服务地址和鉴权
+    base-url: ${MULTIMODAL_API_BASE_URL:https://api.deepseek.com}
+    api-key: ${MULTIMODAL_API_KEY:${DEEP_SEEK_API_KEY:}}
+    # 用于图片/文档理解的多模态模型（按你的AI服务商模型名配置）
+    chat-model: ${MULTIMODAL_CHAT_MODEL:deepseek-chat}
+    # 用于语音转文字的模型（如 whisper-1）
+    audio-model: ${MULTIMODAL_AUDIO_MODEL:whisper-1}
+
+langchain4j:
+  open-ai:
+    chat-model:
+      base-url: https://api.deepseek.com
+      api-key: ${DEEP_SEEK_API_KEY}
+      model-name: deepseek-chat
+      temperature: 0.7
+      log-requests: true
+      log-responses: true
+    streaming-chat-model:
+      base-url: https://api.deepseek.com
+      api-key: ${DEEP_SEEK_API_KEY}
+      model-name: deepseek-chat
+      temperature: 0.7
+      log-requests: true
+      log-responses: true
+    embedding-model:
+      base-url: https://api.deepseek.com
+      api-key: ${DEEP_SEEK_API_KEY}
+      model-name: deepseek-embedding
+      log-requests: true
+      log-responses: true
+      dimensions: 1024
+

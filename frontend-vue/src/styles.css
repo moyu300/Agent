@@ -1,0 +1,177 @@
+:root {
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+}
+
+body {
+  font-family: "Segoe UI", "PingFang SC", sans-serif;
+  color: #111827;
+  background: #f4f6fb;
+}
+
+.page {
+  height: 100%;
+}
+
+.sidebar {
+  background: #111827;
+  color: #f9fafb;
+  border-right: 1px solid #1f2937;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.brand {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.full-width {
+  width: 100%;
+}
+
+.session-list {
+  margin-top: 12px;
+  flex: 1;
+}
+
+.session-item {
+  border: 1px solid transparent;
+  background: #1f2937;
+  border-radius: 10px;
+  margin-bottom: 8px;
+  padding: 10px;
+  cursor: pointer;
+}
+
+.session-item.active,
+.session-item:hover {
+  border-color: #818cf8;
+}
+
+.session-title {
+  color: #f9fafb;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-time {
+  margin-top: 6px;
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  padding: 16px 20px;
+  gap: 12px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.header h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.header span {
+  margin-top: 4px;
+  color: #6b7280;
+  display: block;
+  font-size: 12px;
+}
+
+.message-panel {
+  flex: 1;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.empty-tip {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6b7280;
+}
+
+.message-row {
+  margin-bottom: 12px;
+  display: flex;
+}
+
+.message-row.user {
+  justify-content: flex-end;
+}
+
+.bubble {
+  max-width: 85%;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: #ffffff;
+}
+
+.message-row.user .bubble {
+  border-color: #c7d2fe;
+  background: #eef2ff;
+}
+
+.composer {
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 10px;
+}
+
+.composer-footer {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.composer-footer > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 920px) {
+  .page {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100% !important;
+    border-right: 0;
+    border-bottom: 1px solid #1f2937;
+  }
+}
+

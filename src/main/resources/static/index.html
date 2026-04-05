@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Chat</title>
+    <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<div class="layout">
+    <aside class="sidebar">
+        <div class="brand">Agent</div>
+        <button id="newSessionBtn" class="btn btn-primary" type="button">+ 新对话</button>
+        <ul id="sessionList" class="session-list"></ul>
+    </aside>
+
+    <main class="main">
+        <header class="header">
+            <div>
+                <h1 id="titleText">新对话</h1>
+                <p id="statusText">准备就绪</p>
+            </div>
+            <button id="deleteSessionBtn" class="btn" type="button">删除会话</button>
+        </header>
+
+        <section id="messageList" class="messages"></section>
+
+        <footer class="composer">
+            <textarea id="promptInput" rows="3" placeholder="输入你的问题，Enter 发送，Shift+Enter 换行"></textarea>
+            <div class="composer-actions">
+                <span id="charCount">0 字</span>
+                <div>
+                    <button id="stopBtn" class="btn" type="button" disabled>停止</button>
+                    <button id="sendBtn" class="btn btn-primary" type="button">发送</button>
+                </div>
+            </div>
+        </footer>
+    </main>
+</div>
+
+<script src="./app.js"></script>
+</body>
+</html>
+
