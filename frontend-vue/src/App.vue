@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, reactive, ref } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import {
   createSession,
@@ -170,6 +170,11 @@ async function selectSession(sessionId) {
     return;
   }
 
+  if (sending.value) {
+    ElMessage.warning("请先停止当前输出");
+    return;
+  }
+
   loading.value = true;
   statusText.value = "加载会话...";
   try {
@@ -274,16 +279,16 @@ async function handleSend() {
     await handleCreateSession();
   }
 
-  const userMessage = {
+  const userMessage = reactive({
     id: `user-${Date.now()}`,
     role: "user",
     content: text
-  };
-  const assistantMessage = {
+  });
+  const assistantMessage = reactive({
     id: `assistant-${Date.now()}`,
     role: "assistant",
     content: ""
-  };
+  });
 
   messages.value.push(userMessage, assistantMessage);
   inputText.value = "";
@@ -292,6 +297,7 @@ async function handleSend() {
   sending.value = true;
   statusText.value = "正在生成...";
   abortController = new AbortController();
+  let streamFinished = false;
 
   try {
     await streamChat(
@@ -304,15 +310,24 @@ async function handleSend() {
         if (event === "message") {
           assistantMessage.content += data;
           await scrollToBottom();
+        } else if (event === "done") {
+          streamFinished = true;
         } else if (event === "error") {
           throw new Error(data || "流式响应异常");
         }
       }
     );
 
+    if (!streamFinished) {
+      throw new Error("流式输出中断");
+    }
+
     statusText.value = "完成";
     await loadSessions();
-    await selectSession(activeSessionId.value);
+    const detail = await fetchSessionDetail(activeSessionId.value);
+    messages.value = normalizeMessages(detail.messages);
+    upsertSessionMeta(detail.sessionId, detail.title);
+    await scrollToBottom();
   } catch (error) {
     if (error.name === "AbortError") {
       statusText.value = "已停止";

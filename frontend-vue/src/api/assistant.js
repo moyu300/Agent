@@ -72,6 +72,31 @@ export async function streamChat(payload, signal, onEvent) {
   const decoder = new TextDecoder("utf-8");
   let buffer = "";
 
+  const emitChunk = (chunk) => {
+    if (!chunk || !chunk.trim()) {
+      return;
+    }
+
+    const lines = chunk.split("\n");
+    let event = "message";
+    const dataLines = [];
+
+    for (const rawLine of lines) {
+      const line = rawLine.trimEnd();
+      if (!line || line.startsWith(":")) {
+        continue;
+      }
+      if (line.startsWith("event:")) {
+        event = line.slice(6).trim();
+      } else if (line.startsWith("data:")) {
+        const raw = line.slice(5);
+        dataLines.push(raw.startsWith(" ") ? raw.slice(1) : raw);
+      }
+    }
+
+    onEvent({ event, data: dataLines.join("\n") });
+  };
+
   while (true) {
     const { value, done } = await reader.read();
     if (done) {
@@ -79,24 +104,20 @@ export async function streamChat(payload, signal, onEvent) {
     }
 
     buffer += decoder.decode(value, { stream: true });
-    const chunks = buffer.split("\n\n");
-    buffer = chunks.pop() || "";
 
-    for (const chunk of chunks) {
-      const lines = chunk.split("\n");
-      let event = "message";
-      let data = "";
+    // Support both "\n\n" and "\r\n\r\n" SSE frame separators.
+    const separator = /\r?\n\r?\n/;
+    const chunks = buffer.split(separator);
+    const frames = chunks.slice(0, -1);
+    buffer = chunks[chunks.length - 1] || "";
 
-      for (const line of lines) {
-        if (line.startsWith("event:")) {
-          event = line.slice(6).trim();
-        } else if (line.startsWith("data:")) {
-          data += line.slice(5);
-        }
-      }
-
-      onEvent({ event, data });
+    for (const chunk of frames) {
+      emitChunk(chunk);
     }
   }
+
+  // Flush remaining partial chunk after stream completes.
+  const tail = buffer + decoder.decode();
+  emitChunk(tail);
 }
 

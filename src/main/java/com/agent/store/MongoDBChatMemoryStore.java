@@ -88,15 +88,17 @@ public class MongoDBChatMemoryStore implements ChatMemoryStore {
         Update update = new Update()
                 .set("updatedAt", now)
                 .setOnInsert("sessionId", sessionId)
-                .setOnInsert("createdAt", now)
-                .setOnInsert("title", "新对话");
+                .setOnInsert("createdAt", now);
 
-        if (session != null && (session.getSessionId() == null || session.getSessionId().isBlank())) {
+        boolean needBackfillSessionId = session != null
+                && (session.getSessionId() == null || session.getSessionId().isBlank());
+        if (needBackfillSessionId) {
             // 兼容旧文档，补齐 sessionId，后续查询直接命中 sessionId。
             update.set("sessionId", sessionId);
         }
 
-        if (session == null || shouldGenerateTitle(session)) {
+        boolean needGenerateTitle = session == null || shouldGenerateTitle(session);
+        if (needGenerateTitle) {
             update.set("title", generateTitle(messages));
         }
 
