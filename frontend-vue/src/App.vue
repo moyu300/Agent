@@ -148,6 +148,7 @@ async function handleFileChange(uploadFile) {
   }
 }
 
+
 function normalizeSessions(data) {
   return Array.isArray(data)
     ? data.map((item) => ({

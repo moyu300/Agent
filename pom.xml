@@ -23,84 +23,109 @@
 
     <dependencyManagement>
         <dependencies>
+            <!-- LangChain4j 阿里百炼 DashScope Spring Boot Starter（统一版本管理） -->
             <dependency>
                 <groupId>dev.langchain4j</groupId>
                 <artifactId>langchain4j-community-dashscope-spring-boot-starter</artifactId>
                 <version>${langchain4j.version}</version>
             </dependency>
+            <!-- LangChain4j Spring Boot Starter（统一版本管理） -->
             <dependency>
                 <groupId>dev.langchain4j</groupId>
                 <artifactId>langchain4j-spring-boot-starter</artifactId>
                 <version>${langchain4j.version}</version>
             </dependency>
+            <!-- LangChain4j MCP 工具调用模块（统一版本管理） -->
             <dependency>
                 <groupId>dev.langchain4j</groupId>
                 <artifactId>langchain4j-mcp</artifactId>
                 <version>${langchain4j.version}</version>
             </dependency>
+            <!-- LangChain4j Reactor 响应式支持（统一版本管理） -->
             <dependency>
                 <groupId>dev.langchain4j</groupId>
                 <artifactId>langchain4j-reactor</artifactId>
                 <version>${langchain4j.version}</version>
             </dependency>
+            <!-- LangChain4j 核心包（统一版本管理，使用稳定版本） -->
             <dependency>
                 <groupId>dev.langchain4j</groupId>
                 <artifactId>langchain4j</artifactId>
                 <version>${langchain4j.core.version}</version>
             </dependency>
+            <!-- LangChain4j PgVector 向量存储（统一版本管理，使用稳定版本） -->
+            <dependency>
+                <groupId>dev.langchain4j</groupId>
+                <artifactId>langchain4j-pgvector</artifactId>
+                <version>${langchain4j.version}</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
     <dependencies>
+        <!-- Web 框架 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
-<!--        <dependency>-->
-<!--            <groupId>dev.langchain4j</groupId>-->
-<!--            <artifactId>langchain4j-open-ai-spring-boot-starter</artifactId>-->
-<!--            <version>1.10.0-beta18</version>-->
-<!--        </dependency>-->
-<!--        <dependency>-->
-<!--            <groupId>dev.langchain4j</groupId>-->
-<!--            <artifactId>langchain4j-spring-boot-starter</artifactId>-->
-<!--            <version>1.10.0-beta18</version>-->
-<!--        </dependency>-->
+        <!-- JDBC 与连接池支持（提供 DataSource 给 PgVector 使用） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jdbc</artifactId>
+        </dependency>
 
-        <!-- https://mvnrepository.com/artifact/dev.langchain4j/langchain4j-community-dashscope-spring-boot-starter -->
+        <!-- LangChain4j 阿里百炼 DashScope Spring Boot Starter -->
         <dependency>
             <groupId>dev.langchain4j</groupId>
             <artifactId>langchain4j-community-dashscope-spring-boot-starter</artifactId>
         </dependency>
+        <!-- LangChain4j 核心能力包 -->
         <dependency>
             <groupId>dev.langchain4j</groupId>
             <artifactId>langchain4j</artifactId>
         </dependency>
+        <!-- LangChain4j PgVector 向量存储 -->
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-pgvector</artifactId>
+        </dependency>
+        <!-- LangChain4j 与 Spring Boot 集成 -->
         <dependency>
             <groupId>dev.langchain4j</groupId>
             <artifactId>langchain4j-spring-boot-starter</artifactId>
         </dependency>
-        <!-- https://mvnrepository.com/artifact/dev.langchain4j/langchain4j-mcp -->
+        <!-- LangChain4j MCP 协议与工具调用支持 -->
         <dependency>
             <groupId>dev.langchain4j</groupId>
             <artifactId>langchain4j-mcp</artifactId>
         </dependency>
+        <!-- LangChain4j Reactor 响应式扩展 -->
         <dependency>
             <groupId>dev.langchain4j</groupId>
             <artifactId>langchain4j-reactor</artifactId>
         </dependency>
+        <!-- HTML 解析与抓取工具 -->
         <dependency>
             <groupId>org.jsoup</groupId>
             <artifactId>jsoup</artifactId>
             <version>1.20.1</version>
         </dependency>
 
+        <!-- MongoDB 驱动 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-mongodb</artifactId>
         </dependency>
 
+        <!-- PostgreSQL JDBC 驱动（运行时） -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- Lombok 注解工具（编译期） -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
@@ -108,6 +133,7 @@
             <optional>true</optional>
         </dependency>
 
+        <!-- Spring Boot 测试套件 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>

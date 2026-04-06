@@ -56,6 +56,7 @@ export function transcribeAudio(fileBlob, fileName = "audio.webm") {
   });
 }
 
+
 export async function streamChat(payload, signal, onEvent) {
   const response = await fetch(API.chatStream, {
     method: "POST",

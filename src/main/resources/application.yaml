@@ -6,6 +6,13 @@ spring:
   data:
     mongodb:
       uri: mongodb://localhost:27017/agent
+
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://192.168.150.101:5432/ai_rag
+    username: ${pg.username:root}
+    password: ${pg.password:root}
+
   servlet:
     multipart:
       max-file-size: 20MB
@@ -15,6 +22,24 @@ server:
   port: 8080
   servlet:
     context-path: /api
+
+rag:
+  pgvector:
+    table: rag_embedding
+    # 维度必须与嵌入模型输出一致（如 text-embedding-v4 常见为 1024）
+    dimension: 1024
+    use-index: true
+    index-list-size: 100
+    create-table: true
+    drop-table-first: false
+    init-extension: true
+  bootstrap:
+    # 启动时仅在向量表为空时执行一次文档入库
+    enabled: true
+    docs-path: src/main/resources/docs
+  retriever:
+    max-results: 8
+    min-score: 0.60
 
 logging:
   level:
