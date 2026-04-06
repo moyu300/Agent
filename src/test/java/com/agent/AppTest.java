@@ -2,10 +2,11 @@ package com.agent;
 
 import org.junit.jupiter.api.Test;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 
 public class AppTest {
 
+    @Test
+    public void test() {
+        System.out.println("我搁这儿放个屁");
+    }
 }

@@ -7,7 +7,9 @@ import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.data.message.UserMessage;
-import dev.langchain4j.model.chat.ChatLanguageModel;
+//import dev.langchain4j.model.chat.ChatLanguageModel;
+import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.service.tool.ToolExecution;
 import dev.langchain4j.store.memory.chat.ChatMemoryStore;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,12 +30,11 @@ import java.util.Locale;
 public class MongoDBChatMemoryStore implements ChatMemoryStore {
 
     private final MongoTemplate mongoTemplate;
-    @Qualifier("openAiChatModel")
-    private final ChatLanguageModel titleModel;
+    @Qualifier("qwenChatModel")
+    private final ChatModel titleModel;
 
     @Autowired
-    public MongoDBChatMemoryStore(MongoTemplate mongoTemplate,
-                                  @Qualifier("openAiChatModel") ChatLanguageModel titleModel) {
+    public MongoDBChatMemoryStore(MongoTemplate mongoTemplate, ChatModel titleModel) {
         this.mongoTemplate = mongoTemplate;
         this.titleModel = titleModel;
     }
@@ -59,6 +60,7 @@ public class MongoDBChatMemoryStore implements ChatMemoryStore {
                         case "user" -> UserMessage.from(content);
                         case "assistant", "ai" -> AiMessage.from(content);
                         case "system" -> SystemMessage.from(content);
+                        case "tool" -> AiMessage.from(content);
                         // 避免在持久化数据中出现历史/未知角色值时崩溃
                         default -> AiMessage.from(content);
                     };
@@ -168,8 +170,8 @@ public class MongoDBChatMemoryStore implements ChatMemoryStore {
             return "system";
         }
         if (chatMsg instanceof ToolExecutionResultMessage) {
-            // 作为助手坚持存在，以保持后续OpenAI负载有效且不包含tool_call元数据。
-            return "assistant";
+            // 持久化层保留 tool 角色，便于会话详情区分来源。
+            return "tool";
         }
         return chatMsg.type().name().toLowerCase();
     }

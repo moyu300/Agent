@@ -2,15 +2,19 @@ package com.agent;
 
 import com.agent.ai.Assistant;
 import com.agent.entity.ChatSession;
+import com.agent.repository.ChatSessionRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 
+@Slf4j
 @SpringBootTest(classes = com.agent.AgentApplication.class)
 public class AgentApplicationTest {
 
@@ -18,6 +22,8 @@ public class AgentApplicationTest {
     private Assistant assistant;
     @Autowired
     private MongoTemplate mongoTemplate;
+    @Autowired
+    private ChatSessionRepository chatSessionRepository;
 
     @Test
     public void testAssistant() {
@@ -64,5 +70,17 @@ public class AgentApplicationTest {
             System.out.println("消息数量：" + session.getMessages().size());
             System.out.println("---");
         }
+    }
+
+    @Test
+    public void testMongoDBSearch(){
+        String userId = "";
+        log.info("查询会话列表, userId={}", StringUtils.hasText(userId) ? userId.trim() : "ALL");
+        List<ChatSession> sessions = StringUtils.hasText(userId)
+                ? chatSessionRepository.findByUserIdOrderByUpdatedAtDesc(userId.trim())
+                : chatSessionRepository.findAllByOrderByUpdatedAtDesc();
+
+        log.info("会话列表查询完成, count={}", sessions.size());
+        log.info("会话列表: {}", sessions);
     }
 }

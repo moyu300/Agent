@@ -1,4 +1,6 @@
 spring:
+  config:
+    import: optional:classpath:application-secret.yaml
   application:
     name: Agent-Assistant
   data:
@@ -29,6 +31,17 @@ multimodal:
     audio-model: ${MULTIMODAL_AUDIO_MODEL:whisper-1}
 
 langchain4j:
+  community:
+    dashscope:
+      chat-model:
+        model-name: qwen-max
+        api-key: ${aliyun.api-key}
+      streaming-chat-model:
+        model-name: qwen-max
+        api-key: ${aliyun.api-key}
+      embedding-model:
+        model-name: text-embedding-v4
+        api-key: ${aliyun.api-key}
   open-ai:
     chat-model:
       base-url: https://api.deepseek.com
@@ -51,4 +64,16 @@ langchain4j:
       log-requests: true
       log-responses: true
       dimensions: 1024
-
+  mcp:
+    servers:
+      aliyun-maps: # 自定义名称
+        type: sse
+        url: https://dashscope.aliyuncs.com/api/v1/mcps/amap-maps/mcp # 你复制的SSE
+        timeout: 10000 # 可选，单位毫秒
+        headers:
+          Authorization: Bearer ${aliyun.api-key} # 百炼 API Key
+#      aliyun-websearch: # 可加多个MCP
+#        type: sse
+#        url: https://api.modelscope.cn/mcp/servers/@modelscope/websearch
+#        headers:
+#          Authorization: Bearer ${ALIYUN_MCP_API_KEY}

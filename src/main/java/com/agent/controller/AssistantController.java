@@ -3,7 +3,7 @@ package com.agent.controller;
 import com.agent.ai.Assistant;
 import com.agent.entity.ChatSession;
 import com.agent.repository.ChatSessionRepository;
-import com.agent.service.FileRecognitionService;
+//import com.agent.service.FileRecognitionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -18,9 +18,13 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.codec.ServerSentEvent;
+import reactor.core.publisher.Mono;
 import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Schedulers;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
@@ -31,7 +35,7 @@ public class AssistantController {
 
     private final Assistant assistant;
     private final ChatSessionRepository chatSessionRepository;
-    private final FileRecognitionService fileRecognitionService;
+//    private final FileRecognitionService fileRecognitionService;
 
     @GetMapping("/sessions")
     public ApiResponse<List<SessionSummary>> sessions(@RequestParam(required = false) String userId) {
@@ -107,8 +111,35 @@ public class AssistantController {
         String sessionId = StringUtils.hasText(request.sessionId())
                 ? request.sessionId().trim()
                 : String.valueOf(System.currentTimeMillis());
+        String message = request.message().trim();
+
+        // 某些模型在 stream 模式下工具调用不稳定；这类请求回退到可调用工具的 chat，再以 SSE 分片输出。
+        if (isToolLikelyQuestion(message)) {
+            return Flux.just(ServerSentEvent.<String>builder()
+                            .event("message")
+                            .data("正在调用MCP工具，请稍候...\n")
+                            .build())
+                    .concatWith(Mono.fromCallable(() -> assistant.chat(sessionId, message))
+                            .subscribeOn(Schedulers.boundedElastic())
+                            .timeout(Duration.ofSeconds(45))
+                            .flatMapMany(answer -> Flux.fromIterable(splitForSse(answer, 12))
+                                    .delayElements(Duration.ofMillis(20))
+                                    .map(chunk -> ServerSentEvent.<String>builder()
+                                            .event("message")
+                                            .data(chunk)
+                                            .build())
+                                    .concatWith(Flux.just(ServerSentEvent.<String>builder()
+                                            .event("done")
+                                            .data("[DONE]")
+                                            .build()))))
+                    .onErrorResume(ex -> Flux.just(ServerSentEvent.<String>builder()
+                            .event("error")
+                            .data(ex.getMessage())
+                            .build()));
+        }
+
         log.info("用户提问完成, sessionId={}", sessionId);
-        return assistant.chatStream(sessionId, request.message().trim())
+        return assistant.chatStream(sessionId, message)
                 .map(token -> ServerSentEvent.<String>builder()
                         .event("message")
                         .data(token)
@@ -123,24 +154,47 @@ public class AssistantController {
                         .build()));
     }
 
-    @PostMapping(value = "/files/recognize", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ApiResponse<FileRecognizeResponse> recognizeFile(@RequestParam("file") MultipartFile file) {
-        log.info("文件识别, fileName={}", file.getOriginalFilename());
-        FileRecognitionService.FileRecognitionResult result = fileRecognitionService.recognize(file);
-        return ApiResponse.success(new FileRecognizeResponse(
-                result.fileName(),
-                result.mediaType(),
-                result.text(),
-                result.truncated()
-        ));
+    private boolean isToolLikelyQuestion(String message) {
+        String text = message == null ? "" : message.toLowerCase();
+        return text.contains("几点")
+                || text.contains("时间")
+                || text.contains("北京时间")
+                || text.contains("天气")
+                || text.contains("翻译")
+                || text.contains("搜索");
     }
 
-    @PostMapping(value = "/audio/transcribe", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ApiResponse<AudioTranscribeResponse> transcribeAudio(@RequestParam("file") MultipartFile file) {
-        log.info("音频转录, fileName={}", file.getOriginalFilename());
-        String text = fileRecognitionService.transcribeAudio(file);
-        return ApiResponse.success(new AudioTranscribeResponse(text));
+    private List<String> splitForSse(String text, int size) {
+        if (!StringUtils.hasText(text)) {
+            return List.of(" ");
+        }
+        int chunkSize = Math.max(1, size);
+        List<String> chunks = new ArrayList<>();
+        for (int i = 0; i < text.length(); i += chunkSize) {
+            int end = Math.min(text.length(), i + chunkSize);
+            chunks.add(text.substring(i, end));
+        }
+        return chunks;
     }
+
+//    @PostMapping(value = "/files/recognize", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+//    public ApiResponse<FileRecognizeResponse> recognizeFile(@RequestParam("file") MultipartFile file) {
+//        log.info("文件识别, fileName={}", file.getOriginalFilename());
+//        FileRecognitionService.FileRecognitionResult result = fileRecognitionService.recognize(file);
+//        return ApiResponse.success(new FileRecognizeResponse(
+//                result.fileName(),
+//                result.mediaType(),
+//                result.text(),
+//                result.truncated()
+//        ));
+//    }
+//
+//    @PostMapping(value = "/audio/transcribe", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+//    public ApiResponse<AudioTranscribeResponse> transcribeAudio(@RequestParam("file") MultipartFile file) {
+//        log.info("音频转录, fileName={}", file.getOriginalFilename());
+//        String text = fileRecognitionService.transcribeAudio(file);
+//        return ApiResponse.success(new AudioTranscribeResponse(text));
+//    }
 
     private SessionSummary toSummary(ChatSession session) {
         return new SessionSummary(

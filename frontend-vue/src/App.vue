@@ -21,10 +21,13 @@ const recognizingFile = ref(false);
 const transcribingAudio = ref(false);
 const recording = ref(false);
 const statusText = ref("准备就绪");
+const theme = ref("light");
 const messagePanelRef = ref();
 let abortController = null;
 let mediaRecorder = null;
 let audioChunks = [];
+
+const themeLabel = computed(() => (theme.value === "light" ? "深色模式" : "浅色模式"));
 
 const activeSessionTitle = computed(() => {
   const found = sessions.value.find((item) => item.id === activeSessionId.value);
@@ -32,6 +35,27 @@ const activeSessionTitle = computed(() => {
 });
 
 const charCount = computed(() => inputText.value.length);
+
+function applyTheme(nextTheme) {
+  theme.value = nextTheme;
+  document.documentElement.setAttribute("data-theme", nextTheme);
+  localStorage.setItem("agent-theme", nextTheme);
+}
+
+function toggleTheme() {
+  applyTheme(theme.value === "light" ? "dark" : "light");
+}
+
+function initTheme() {
+  const saved = localStorage.getItem("agent-theme");
+  if (saved === "light" || saved === "dark") {
+    applyTheme(saved);
+    return;
+  }
+
+  const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  applyTheme(prefersDark ? "dark" : "light");
+}
 
 async function handleRecordAudio() {
   if (transcribingAudio.value) {
@@ -343,6 +367,7 @@ async function handleSend() {
 }
 
 onMounted(() => {
+  initTheme();
   initSessions();
 });
 </script>
@@ -350,8 +375,14 @@ onMounted(() => {
 <template>
   <el-container class="page">
     <el-aside class="sidebar" width="280px">
-      <div class="brand">Agent</div>
+      <div class="brand-wrap">
+        <div class="brand">Agent</div>
+        <p class="brand-subtitle">你的智能会话工作台</p>
+      </div>
+
       <el-button type="primary" class="full-width" @click="handleCreateSession">+ 新对话</el-button>
+
+      <div class="session-meta">共 {{ sessions.length }} 个会话</div>
 
       <el-scrollbar class="session-list">
         <div
@@ -369,11 +400,14 @@ onMounted(() => {
 
     <el-main class="main">
       <div class="header">
-        <div>
+        <div class="header-main">
           <h2>{{ activeSessionTitle }}</h2>
-          <span>{{ statusText }}</span>
+          <span class="status-text">{{ statusText }}</span>
         </div>
-        <el-button :disabled="loading || sending" @click="handleDeleteSession">删除会话</el-button>
+        <div class="header-actions">
+          <el-button @click="toggleTheme">{{ themeLabel }}</el-button>
+          <el-button :disabled="loading || sending" @click="handleDeleteSession">删除会话</el-button>
+        </div>
       </div>
 
       <el-scrollbar ref="messagePanelRef" class="message-panel" v-loading="loading">
@@ -393,8 +427,8 @@ onMounted(() => {
           @keydown.enter.exact.prevent="handleSend"
         />
         <div class="composer-footer">
-          <span>{{ charCount }} 字</span>
-          <div>
+          <span class="composer-hint">{{ charCount }} 字 · Enter 发送 · Shift+Enter 换行</span>
+          <div class="composer-actions">
             <el-upload
               :auto-upload="false"
               :show-file-list="false"
